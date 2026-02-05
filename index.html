@@ -1,0 +1,81 @@
+<script>
+    const PLAYERS = ['Al', 'Andres', 'Mark', 'Gus'];
+    // PASTE YOUR URL BELOW BETWEEN THE QUOTES
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0ZOayLzHfCS74cvtkfkTko2dFFYUrPHAov8kOA4KrsLQa6d2ULKsAeMpCEAGupCbDbA/exec"; 
+    
+    let db = {};
+    let activePlayer = '';
+
+    async function init() {
+        // 1. First, check if we have data in the cloud
+        await refreshDataFromCloud();
+        
+        // 2. Set default date
+        document.getElementById('dateEntry').valueAsDate = new Date();
+        setupInteractionListeners();
+        populateMonthToggle();
+    }
+
+    async function refreshDataFromCloud() {
+        try {
+            const response = await fetch(SCRIPT_URL);
+            const cloudData = await response.json();
+            
+            // Reset local DB
+            PLAYERS.forEach(p => db[p] = []);
+            
+            // Format cloud data back into our app's structure
+            cloudData.forEach(row => {
+                const [date, player, groups, perfect, purple, score] = row;
+                if(db[player]) {
+                    db[player].push({ date, groups, perfect, purple, score });
+                }
+            });
+            renderGlobalDashboard();
+        } catch (e) {
+            console.log("Offline or Error loading cloud data");
+        }
+    }
+
+    async function saveData() {
+        const d = document.getElementById('dateEntry').value;
+        if (!d || selectedGroups === null) return alert("Select date and groups!");
+        
+        const perf = document.getElementById('isPerfect').checked;
+        const purp = document.getElementById('isPurpleFirst').checked;
+        const s = selectedGroups < 4 ? 0 : (purp ? 3 : (perf ? 2 : 1));
+
+        const payload = {
+            date: d,
+            player: activePlayer,
+            groups: selectedGroups,
+            perfect: perf,
+            purple: purp,
+            score: s
+        };
+
+        // Show a loading state
+        const saveBtn = document.querySelector('.btn-save');
+        saveBtn.innerText = "Saving to Cloud...";
+        saveBtn.disabled = true;
+
+        try {
+            await fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            
+            // After saving, refresh everything
+            await refreshDataFromCloud();
+            renderHistory(activePlayer);
+            saveBtn.innerText = "Save Result";
+            saveBtn.disabled = false;
+            alert("Score Recorded!");
+        } catch (e) {
+            alert("Error saving. Check your internet.");
+            saveBtn.disabled = false;
+        }
+    }
+
+    // ... Keep all your previous CSS, HTML, and other JS functions (renderHistory, renderGlobalDashboard, etc.) ...
+</script>
