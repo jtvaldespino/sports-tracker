@@ -78,7 +78,6 @@
         .group-btn.active { background-color: var(--primary); color: white; border-color: var(--primary); }
 
         .checkbox-wrapper { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.5rem; }
-        .checkbox-wrapper.disabled { opacity: 0.5; cursor: not-allowed; }
         
         .btn-save { width: 100%; background-color: var(--primary); color: white; padding: 0.75rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
         .btn-save:disabled { background-color: #9ca3af; cursor: not-allowed; }
@@ -145,10 +144,10 @@
                             <button type="button" class="group-btn" data-val="4">4</button>
                         </div>
                     </div>
-                    <div class="checkbox-wrapper" id="perfectWrapper">
+                    <div class="checkbox-wrapper">
                         <input type="checkbox" id="isPerfect"><label for="isPerfect" style="margin:0; cursor:pointer;">Perfect (No mistakes)</label>
                     </div>
-                    <div class="checkbox-wrapper" id="purpleWrapper">
+                    <div class="checkbox-wrapper">
                         <input type="checkbox" id="isPurpleFirst"><label for="isPurpleFirst" style="margin:0; cursor:pointer;">Purple Solved First</label>
                     </div>
                     <button class="btn-save" id="saveBtn" onclick="saveData()">Save Result</button>
@@ -236,7 +235,7 @@
             loadJanuaryData(); 
             document.getElementById('dateEntry').valueAsDate = new Date();
             setupInteractionListeners();
-            try { await refreshDataFromCloud(); } catch (e) { console.warn("Cloud failed"); }
+            try { await refreshDataFromCloud(); } catch (e) { console.warn("Cloud pull failed"); }
             populateMonthToggle();
             renderGlobalDashboard();
         }
@@ -255,9 +254,13 @@
             if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbxyeqKspdOiduWojU0kZMq1iK4BJ3CmxVyQIAZTjQ92RjlwcWJzzs8lQu9e11lbHEkrnA/exec")) return;
             const response = await fetch(SCRIPT_URL);
             const cloudData = await response.json();
+            
+            // Re-sync local state from Sheet
             cloudData.forEach(row => {
                 const [date, player, groups, perfect, purple, score] = row;
-                if(db[player] && !date.startsWith("2025-01")) {
+                if(db[player]) {
+                    // Update if exists, else push
+                    db[player] = db[player].filter(e => e.date !== date);
                     db[player].push({ date, groups, perfect, purple, score });
                 }
             });
@@ -272,16 +275,9 @@
                     document.querySelectorAll('.group-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     selectedGroups = parseInt(btn.dataset.val);
-                    updateCheckboxes();
                 };
             });
-            document.getElementById('isPerfect').onchange = updateCheckboxes;
         }
-
-		function updateCheckboxes() {
-			// Restrictions removed as requested.
-			// We keep the function name so the listeners don't break.
-		}
 
         async function enterApp(name) {
             activePlayer = name;
@@ -293,69 +289,55 @@
             renderGlobalDashboard();
         }
 
-		async function saveData() {
-			const d = document.getElementById('dateEntry').value;
-			if (!d || selectedGroups === null) return alert("Select date and groups!");
-			
-			const perf = document.getElementById('isPerfect').checked;
-			const purp = document.getElementById('isPurpleFirst').checked;
-			const s = selectedGroups < 4 ? 0 : (purp ? 3 : (perf ? 2 : 1));
+        async function saveData() {
+            const d = document.getElementById('dateEntry').value;
+            if (!d || selectedGroups === null) return alert("Select date and groups!");
+            
+            const perf = document.getElementById('isPerfect').checked;
+            const purp = document.getElementById('isPurpleFirst').checked;
+            const s = selectedGroups < 4 ? 0 : (purp ? 3 : (perf ? 2 : 1));
 
-			const payload = { date: d, player: activePlayer, groups: selectedGroups, perfect: perf, purple: purp, score: s };
-			const btn = document.getElementById('saveBtn');
-			
-			btn.disabled = true; 
-			btn.innerText = "Syncing...";
+            const payload = { date: d, player: activePlayer, groups: selectedGroups, perfect: perf, purple: purp, score: s };
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true; 
+            btn.innerText = "Syncing...";
 
-			// --- CRITICAL HISTORY FIX ---
-			// Update the local database immediately so history updates on screen
-			const newEntry = { date: d, groups: selectedGroups, perfect: perf, purple: purp, score: s };
-			
-			// Remove any existing entry for this date to avoid duplicates in the history view
-			db[activePlayer] = db[activePlayer].filter(entry => entry.date !== d);
-			db[activePlayer].push(newEntry);
-			
-			// Re-render the tables and charts immediately
-			renderHistory(activePlayer);
-			renderGlobalDashboard();
+            // 1. UPDATE LOCAL HISTORY IMMEDIATELY
+            db[activePlayer] = db[activePlayer].filter(entry => entry.date !== d);
+            db[activePlayer].push({ date: d, groups: selectedGroups, perfect: perf, purple: purp, score: s });
+            
+            renderHistory(activePlayer);
+            populateMonthToggle();
+            renderGlobalDashboard();
 
-			try {
-				await fetch(SCRIPT_URL, { 
-					method: 'POST', 
-					mode: 'no-cors', 
-					body: JSON.stringify(payload) 
-				});
-				
-				// Success feedback
-				setTimeout(() => {
-					btn.disabled = false;
-					btn.innerText = "Save Result";
-					// Optional: refresh from cloud to get other players' updates
-					refreshDataFromCloud(); 
-				}, 1000);
+            try {
+                await fetch(SCRIPT_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    body: JSON.stringify(payload) 
+                });
+                
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerText = "Save Result";
+                    refreshDataFromCloud(); 
+                }, 1000);
+            } catch (e) { 
+                btn.disabled = false;
+                btn.innerText = "Save Result";
+            }
+        }
 
-			} catch (e) { 
-				console.error("Sync Error:", e);
-				btn.disabled = false;
-				btn.innerText = "Save Result";
-			}
-		}
-
-		function populateMonthToggle() {
-			const select = document.getElementById('monthToggle');
-			// Get all unique months from the data, plus ensure the current month is an option
-			const rawMonths = Object.values(db).flat().map(e => e.date.slice(0, 7));
-			const currentMonth = new Date().toISOString().slice(0, 7);
-			rawMonths.push(currentMonth); 
-
-			const months = [...new Set(rawMonths)].sort().reverse();
-			
-			const savedSelection = select.value;
-			select.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
-			
-			// If we just saved data for a new month, switch to it, otherwise stay on current selection
-			select.value = savedSelection || currentMonth;
-		}
+        function populateMonthToggle() {
+            const select = document.getElementById('monthToggle');
+            const rawMonths = Object.values(db).flat().map(e => e.date.slice(0, 7));
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            rawMonths.push(currentMonth);
+            const months = [...new Set(rawMonths)].sort().reverse();
+            const savedSelection = select.value;
+            select.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+            select.value = savedSelection || currentMonth;
+        }
 
         function renderHistory(p) {
             const hist = [...db[p]].sort((a,b) => b.date.localeCompare(a.date));
@@ -365,86 +347,64 @@
             `).join('');
         }
 
-		function renderGlobalDashboard() {
-			const month = document.getElementById('monthToggle').value;
-			if(!month) return;
-			
-			// 1. Monthly Chart
-			const monthlyScores = PLAYERS.map(p => ({ 
-				name: p, pts: db[p].filter(e => e.date.startsWith(month)).reduce((a,b) => a+b.score, 0) 
-			}));
-			const maxM = Math.max(...monthlyScores.map(d => d.pts), 1);
-			document.getElementById('chartContainer').innerHTML = monthlyScores.sort((a,b) => b.pts - a.pts).map(d => `
-				<div class="chart-row"><div class="chart-label">${d.name}</div>
-				<div class="chart-track"><div class="chart-bar" style="width:${(d.pts/maxM)*100}%"></div></div>
-				<div class="chart-value">${d.pts}</div></div>`).join('');
+        function renderGlobalDashboard() {
+            const month = document.getElementById('monthToggle').value;
+            if(!month) return;
+            
+            const monthlyScores = PLAYERS.map(p => ({ 
+                name: p, pts: db[p].filter(e => e.date.startsWith(month)).reduce((a,b) => a+b.score, 0) 
+            }));
+            const maxM = Math.max(...monthlyScores.map(d => d.pts), 1);
+            document.getElementById('chartContainer').innerHTML = monthlyScores.sort((a,b) => b.pts - a.pts).map(d => `
+                <div class="chart-row"><div class="chart-label">${d.name}</div>
+                <div class="chart-track"><div class="chart-bar" style="width:${(d.pts/maxM)*100}%"></div></div>
+                <div class="chart-value">${d.pts}</div></div>`).join('');
 
-			// 2. Season Standing (Only award points for COMPLETED months)
-			const allMonths = [...new Set(Object.values(db).flat().map(e => e.date.slice(0, 7)))].sort();
-			let seasonBonusTotals = { 'Al': 0, 'Andres': 0, 'Mark': 0, 'Gus': 0 };
+            const allMonths = [...new Set(Object.values(db).flat().map(e => e.date.slice(0, 7)))].sort();
+            let seasonBonusTotals = { 'Al': 0, 'Andres': 0, 'Mark': 0, 'Gus': 0 };
+            const today = new Date().toISOString().slice(0, 7);
 
-			allMonths.forEach(m => {
-				// Define "Complete" as a month that has passed or is February and has 28+ entries
-				const entriesInMonth = db[PLAYERS[0]].filter(e => e.date.startsWith(m)).length;
-				const isPastMonth = new Date(m + "-28") < new Date(); 
-				
-				// Only calculate bonus if the month is finished
-				if (isPastMonth && entriesInMonth >= 28) {
-					const mRank = PLAYERS.map(p => ({
-						name: p, pts: db[p].filter(e => e.date.startsWith(m)).reduce((a,b) => a+b.score, 0)
-					})).sort((a,b) => b.pts - a.pts);
+            allMonths.forEach(m => {
+                if (m < today) {
+                    const mRank = PLAYERS.map(p => ({
+                        name: p, pts: db[p].filter(e => e.date.startsWith(m)).reduce((a,b) => a+b.score, 0)
+                    })).sort((a,b) => b.pts - a.pts);
+                    const bonuses = [12, 5, 3, 1];
+                    mRank.forEach((player, index) => { seasonBonusTotals[player.name] += bonuses[index]; });
+                }
+            });
 
-					const bonuses = [12, 5, 3, 1];
-					mRank.forEach((player, index) => {
-						seasonBonusTotals[player.name] += bonuses[index];
-					});
-				}
-			});
+            const seasonData = PLAYERS.map(p => ({ name: p, pts: seasonBonusTotals[p] }));
+            const maxS = Math.max(...seasonData.map(d => d.pts), 1);
+            document.getElementById('totalPointsContainer').innerHTML = seasonData.sort((a,b) => b.pts - a.pts).map(d => `
+                <div class="chart-row"><div class="chart-label">${d.name}</div>
+                <div class="chart-track"><div class="chart-bar total-bar" style="width:${(d.pts/maxS)*100}%"></div></div>
+                <div class="chart-value">${d.pts}</div></div>`).join('');
 
-			const seasonData = PLAYERS.map(p => ({ name: p, pts: seasonBonusTotals[p] }));
-			const maxS = Math.max(...seasonData.map(d => d.pts), 1);
-			document.getElementById('totalPointsContainer').innerHTML = seasonData.sort((a,b) => b.pts - a.pts).map(d => `
-				<div class="chart-row"><div class="chart-label">${d.name}</div>
-				<div class="chart-track"><div class="chart-bar total-bar" style="width:${(d.pts/maxS)*100}%"></div></div>
-				<div class="chart-value">${d.pts}</div></div>`).join('');
+            renderSuperlatives(month);
+        }
 
-			renderSuperlatives(month);
-		}
-
-		function renderSuperlatives(month) {
-			const statsConfig = [
-				{ l: 'Most 3 Pts', k: '3pt' },
-				{ l: 'Most 1 Pt', k: '1pt' },
-				{ l: 'Most 0 Pts', k: '0pt' },
-				{ l: 'Longest Streak', k: 'str' },
-				{ l: 'Dry Spell', k: 'dry' }
-			];
-
-			document.getElementById('superlativesContainer').innerHTML = statsConfig.map(s => {
-				const res = PLAYERS.map(p => {
-					const mHist = db[p].filter(e => e.date.startsWith(month)).sort((a,b) => a.date.localeCompare(b.date));
-					let val = 0;
-					if(s.k === '3pt') val = mHist.filter(e => e.score === 3).length;
-					if(s.k === '1pt') val = mHist.filter(e => e.score === 1).length;
-					if(s.k === '0pt') val = mHist.filter(e => e.score === 0).length;
-					if(s.k === 'str') {
-						let cur = 0, max = 0;
-						mHist.forEach(e => { if(e.score > 0) { cur++; max = Math.max(max, cur); } else cur = 0; });
-						val = max;
-					}
-					if(s.k === 'dry') {
-						let cur = 0, max = 0;
-						mHist.forEach(e => { if(e.score === 0) { cur++; max = Math.max(max, cur); } else cur = 0; });
-						val = max;
-					}
-					return { n: p, v: val };
-				});
-
-				const topVal = Math.max(...res.map(r => r.v));
-				const winners = res.filter(r => r.v === topVal && topVal > 0).map(r => r.n);
-				return `<div class="super-card"><h4>${s.l}</h4><div class="super-winner">${winners.length ? winners.join(', ') : 'N/A'}</div><div class="super-val">${topVal}</div></div>`;
-			}).join('');
-		}
+        function renderSuperlatives(month) {
+            const configs = [
+                { l: 'Most 3 Pts', k: '3pt' }, { l: 'Most 1 Pt', k: '1pt' }, { l: 'Most 0 Pts', k: '0pt' },
+                { l: 'Longest Streak', k: 'str' }, { l: 'Dry Spell', k: 'dry' }
+            ];
+            document.getElementById('superlativesContainer').innerHTML = configs.map(s => {
+                const res = PLAYERS.map(p => {
+                    const mHist = db[p].filter(e => e.date.startsWith(month)).sort((a,b) => a.date.localeCompare(b.date));
+                    let val = 0;
+                    if(s.k === '3pt') val = mHist.filter(e => e.score === 3).length;
+                    if(s.k === '1pt') val = mHist.filter(e => e.score === 1).length;
+                    if(s.k === '0pt') val = mHist.filter(e => e.score === 0).length;
+                    if(s.k === 'str') { let c=0,m=0; mHist.forEach(e=>{if(e.score>0){c++;m=Math.max(m,c);}else c=0;}); val=m; }
+                    if(s.k === 'dry') { let c=0,m=0; mHist.forEach(e=>{if(e.score===0){c++;m=Math.max(m,c);}else c=0;}); val=m; }
+                    return { n: p, v: val };
+                });
+                const topVal = Math.max(...res.map(r => r.v));
+                const winners = res.filter(r => r.v === topVal && topVal > 0).map(r => r.n);
+                return `<div class="super-card"><h4>${s.l}</h4><div class="super-winner">${winners.length?winners.join(', '):'N/A'}</div><div class="super-val">${topVal}</div></div>`;
+            }).join('');
+        }
         init();
     </script>
 </body>
