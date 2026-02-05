@@ -103,7 +103,9 @@
 
         .super-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
         .super-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; text-align: center; }
+        .super-card h4 { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; }
         .super-winner { font-size: 1rem; font-weight: 700; color: var(--primary); margin-bottom: 0.25rem;}
+        .super-val { font-size: 0.8rem; font-weight: 600; }
         
         .logout-btn { font-size: 0.75rem; color: #a5b4fc; cursor: pointer; text-decoration: underline; background: none; border: none; margin-top: 0.5rem; }
         .month-toggle { padding: 0.25rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.875rem; color: var(--primary); }
@@ -151,6 +153,7 @@
                     </div>
                     <button class="btn-save" id="saveBtn" onclick="saveData()">Save Result</button>
                 </div>
+
                 <div class="card">
                     <div class="card-header"><h2 class="card-title"><span id="statsPlayerName">...</span>'s History</h2></div>
                     <div class="table-container">
@@ -160,16 +163,35 @@
                         </table>
                     </div>
                 </div>
+
                 <div class="card">
                     <div class="card-header"><h2 class="card-title">Point Rules</h2></div>
-                    <p style="font-size: 0.8rem; color: var(--text-muted);">Points sync across all players via Google Sheets.</p>
+                    <ul style="font-size: 0.85rem; padding-left: 1.2rem; line-height: 1.8; color: var(--text-main);">
+                        <li><span class="score-badge score-3" style="width:20px; text-align:center">+3</span> <strong>Purple 1st</strong> (Perfect 4)</li>
+                        <li><span class="score-badge score-2" style="width:20px; text-align:center">+2</span> <strong>Perfect 4</strong> (No mistakes)</li>
+                        <li><span class="score-badge score-1" style="width:20px; text-align:center">+1</span> <strong>4 Groups</strong> (With mistakes)</li>
+                        <li><span class="score-badge score-0" style="width:20px; text-align:center">+0</span> <strong>Fail</strong> (3 or less groups)</li>
+                    </ul>
+                    <hr style="margin: 1rem 0; border: 0; border-top: 1px solid var(--border);">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Data is synced to Google Sheets for all remote players.</p>
                 </div>
             </div>
+
             <div class="grid-row mid-grid">
-                <div class="card"><div class="card-header"><h2 class="card-title">Monthly Chart</h2><select id="monthToggle" class="month-toggle" onchange="renderGlobalDashboard()"></select></div><div id="chartContainer"></div></div>
-                <div class="card"><div class="card-header"><h2 class="card-title">Season Standing</h2></div><div id="totalPointsContainer"></div></div>
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title">Monthly Chart</h2><select id="monthToggle" class="month-toggle" onchange="renderGlobalDashboard()"></select></div>
+                    <div id="chartContainer" style="padding: 1rem 0;"></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title">Season Standing</h2></div>
+                    <div id="totalPointsContainer" style="padding: 1rem 0;"></div>
+                </div>
             </div>
-            <div class="card"><div class="card-header"><h2 class="card-title" id="superTitle">Superlatives</h2></div><div class="super-grid" id="superlativesContainer"></div></div>
+
+            <div class="card">
+                <div class="card-header"><h2 class="card-title" id="superTitle">Superlatives</h2></div>
+                <div class="super-grid" id="superlativesContainer"></div>
+            </div>
         </div>
     </div>
 
@@ -180,58 +202,71 @@
         // ---------------------------------------------------------
 
         const PLAYERS = ['Al', 'Andres', 'Mark', 'Gus'];
-		const JAN_DATA = [
-			{ day: 1, Al: 1, Andres: 0, Gus: 0, Mark: 0 }, { day: 2, Al: 0, Andres: 0, Gus: 0, Mark: 1 },
-			{ day: 3, Al: 1, Andres: 1, Gus: 1, Mark: 1 }, { day: 4, Al: 1, Andres: 0, Gus: 0, Mark: 1 },
-			{ day: 5, Al: 1, Andres: 0, Gus: 0, Mark: 1 }, { day: 6, Al: 0, Andres: 0, Gus: 0, Mark: 0 },
-			{ day: 7, Al: 0, Andres: 0, Gus: 3, Mark: 3 }, { day: 8, Al: 3, Andres: 3, Gus: 0, Mark: 1 },
-			{ day: 9, Al: 1, Andres: 1, Gus: 1, Mark: 0 }, { day: 10, Al: 1, Andres: 1, Gus: 1, Mark: 1 },
-			{ day: 11, Al: 1, Andres: 1, Gus: 0, Mark: 1 }, { day: 12, Al: 0, Andres: 0, Gus: 0, Mark: 0 },
-			{ day: 13, Al: 1, Andres: 1, Gus: 0, Mark: 1 }, { day: 14, Al: 0, Andres: 1, Gus: 0, Mark: 1 },
-			{ day: 15, Al: 1, Andres: 0, Gus: 1, Mark: 1 }, { day: 16, Al: 3, Andres: 3, Gus: 1, Mark: 1 },
-			{ day: 17, Al: 0, Andres: 0, Gus: 0, Mark: 0 }, { day: 18, Al: 3, Andres: 3, Gus: 1, Mark: 1 },
-			{ day: 19, Al: 0, Andres: 1, Gus: 0, Mark: 0 }, { day: 20, Al: 3, Andres: 1, Gus: 1, Mark: 1 },
-			{ day: 21, Al: 0, Andres: 0, Gus: 0, Mark: 1 }, { day: 22, Al: 0, Andres: 0, Gus: 0, Mark: 1 },
-			{ day: 23, Al: 3, Andres: 1, Gus: 1, Mark: 1 }, { day: 24, Al: 0, Andres: 1, Gus: 1, Mark: 1 },
-			{ day: 25, Al: 0, Andres: 1, Gus: 1, Mark: 1 }, { day: 26, Al: 1, Andres: 1, Gus: 0, Mark: 0 },
-			{ day: 27, Al: 3, Andres: 3, Gus: 3, Mark: 0 }, { day: 28, Al: 0, Andres: 0, Gus: 0, Mark: 3 },
-			{ day: 29, Al: 0, Andres: 3, Gus: 0, Mark: 0 }, { day: 30, Al: 0, Andres: 1, Gus: 0, Mark: 1 },
-			{ day: 31, Al: 1, Andres: 0, Gus: 1, Mark: 0 }
-		];
-
-		function loadJanuaryData() {
-			JAN_DATA.forEach(row => {
-				const d = `2025-01-${String(row.day).padStart(2, '0')}`;
-				PLAYERS.forEach(p => {
-					const s = row[p];
-					db[p].push({ 
-						date: d, 
-						score: s, 
-						groups: s > 0 ? 4 : 0, 
-						perfect: s >= 2, 
-						purple: s === 3 
-					});
-				});
-			});
-		}
         let db = {};
         let activePlayer = '';
         let selectedGroups = null;
 
-		async function init() {
-			// 1. Initialize empty arrays for everyone
-			PLAYERS.forEach(p => db[p] = []);
-			
-			// 2. Load the January backfill FIRST
-			loadJanuaryData(); 
-			
-			// 3. Set the date picker to today
-			document.getElementById('dateEntry').valueAsDate = new Date();
-			setupInteractionListeners();
-			
-			// 4. Now fetch any NEW data from the cloud
-			await refreshDataFromCloud();
-		}
+        const JAN_DATA = [
+            { day: 1, Al: 1, Andres: 0, Gus: 0, Mark: 0 }, { day: 2, Al: 0, Andres: 0, Gus: 0, Mark: 1 },
+            { day: 3, Al: 1, Andres: 1, Gus: 1, Mark: 1 }, { day: 4, Al: 1, Andres: 0, Gus: 0, Mark: 1 },
+            { day: 5, Al: 1, Andres: 0, Gus: 0, Mark: 1 }, { day: 6, Al: 0, Andres: 0, Gus: 0, Mark: 0 },
+            { day: 7, Al: 0, Andres: 0, Gus: 3, Mark: 3 }, { day: 8, Al: 3, Andres: 3, Gus: 0, Mark: 1 },
+            { day: 9, Al: 1, Andres: 1, Gus: 1, Mark: 0 }, { day: 10, Al: 1, Andres: 1, Gus: 1, Mark: 1 },
+            { day: 11, Al: 1, Andres: 1, Gus: 0, Mark: 1 }, { day: 12, Al: 0, Andres: 0, Gus: 0, Mark: 0 },
+            { day: 13, Al: 1, Andres: 1, Gus: 0, Mark: 1 }, { day: 14, Al: 0, Andres: 1, Gus: 0, Mark: 1 },
+            { day: 15, Al: 1, Andres: 0, Gus: 1, Mark: 1 }, { day: 16, Al: 3, Andres: 3, Gus: 1, Mark: 1 },
+            { day: 17, Al: 0, Andres: 0, Gus: 0, Mark: 0 }, { day: 18, Al: 3, Andres: 3, Gus: 1, Mark: 1 },
+            { day: 19, Al: 0, Andres: 1, Gus: 0, Mark: 0 }, { day: 20, Al: 3, Andres: 1, Gus: 1, Mark: 1 },
+            { day: 21, Al: 0, Andres: 0, Gus: 0, Mark: 1 }, { day: 22, Al: 0, Andres: 0, Gus: 0, Mark: 1 },
+            { day: 23, Al: 3, Andres: 1, Gus: 1, Mark: 1 }, { day: 24, Al: 0, Andres: 1, Gus: 1, Mark: 1 },
+            { day: 25, Al: 0, Andres: 1, Gus: 1, Mark: 1 }, { day: 26, Al: 1, Andres: 1, Gus: 0, Mark: 0 },
+            { day: 27, Al: 3, Andres: 3, Gus: 3, Mark: 0 }, { day: 28, Al: 0, Andres: 0, Gus: 0, Mark: 3 },
+            { day: 29, Al: 0, Andres: 3, Gus: 0, Mark: 0 }, { day: 30, Al: 0, Andres: 1, Gus: 0, Mark: 1 },
+            { day: 31, Al: 1, Andres: 0, Gus: 1, Mark: 0 }
+        ];
+
+        async function init() {
+            PLAYERS.forEach(p => db[p] = []);
+            loadJanuaryData(); // Backfill Jan data immediately
+            document.getElementById('dateEntry').valueAsDate = new Date();
+            setupInteractionListeners();
+            
+            // Try cloud, but always render at the end regardless
+            try {
+                await refreshDataFromCloud();
+            } catch (e) {
+                console.warn("Cloud failed, rendering local only");
+            }
+            populateMonthToggle();
+            renderGlobalDashboard();
+        }
+
+        function loadJanuaryData() {
+            JAN_DATA.forEach(row => {
+                const d = `2025-01-${String(row.day).padStart(2, '0')}`;
+                PLAYERS.forEach(p => {
+                    const s = row[p];
+                    db[p].push({ date: d, score: s, groups: s > 0 ? 4 : 0, perfect: s >= 2, purple: s === 3 });
+                });
+            });
+        }
+
+        async function refreshDataFromCloud() {
+            if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbz0ZOayLzHfCS74cvtkfkTko2dFFYUrPHAov8kOA4KrsLQa6d2ULKsAeMpCEAGupCbDbA/exec")) return;
+            const response = await fetch(SCRIPT_URL);
+            const cloudData = await response.json();
+            
+            cloudData.forEach(row => {
+                const [date, player, groups, perfect, purple, score] = row;
+                // Avoid duplicating Jan data
+                if(db[player] && !date.startsWith("2025-01")) {
+                    db[player].push({ date, groups, perfect, purple, score });
+                }
+            });
+            populateMonthToggle();
+            renderGlobalDashboard();
+            if(activePlayer) renderHistory(activePlayer);
+        }
 
         function setupInteractionListeners() {
             document.querySelectorAll('.group-btn').forEach(btn => {
@@ -265,29 +300,6 @@
             renderGlobalDashboard();
         }
 
-		async function refreshDataFromCloud() {
-			if (SCRIPT_URL === "YOUR_GOOGLE_WEB_APP_URL_HERE" || SCRIPT_URL === "") return;
-			try {
-				const response = await fetch(SCRIPT_URL);
-				const cloudData = await response.json();
-				
-				// Add cloud data ONLY if it's not already in January
-				cloudData.forEach(row => {
-					const [date, player, groups, perfect, purple, score] = row;
-					// This prevents duplicating the January backfill
-					if(db[player] && !date.startsWith("2025-01")) { 
-						db[player].push({ date, groups, perfect, purple, score });
-					}
-				});
-
-				populateMonthToggle();
-				renderGlobalDashboard();
-				if(activePlayer) renderHistory(activePlayer);
-			} catch (e) { 
-				console.error("Cloud Error:", e);
-			}
-		}
-
         async function saveData() {
             const d = document.getElementById('dateEntry').value;
             if (!d || selectedGroups === null) return alert("Select date and groups!");
@@ -303,16 +315,16 @@
                 await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
                 await refreshDataFromCloud();
                 btn.disabled = false; btn.innerText = "Save Result";
-            } catch (e) { alert("Save failed!"); btn.disabled = false; }
+            } catch (e) { alert("Save failed! Using Local View."); btn.disabled = false; }
         }
 
         function populateMonthToggle() {
             const select = document.getElementById('monthToggle');
-            const currentVal = select.value;
             const months = [...new Set(Object.values(db).flat().map(e => e.date.slice(0, 7)))].sort().reverse();
             if (months.length === 0) return;
+            const currentVal = select.value || months[0];
             select.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
-            if (currentVal && months.includes(currentVal)) select.value = currentVal;
+            select.value = currentVal;
         }
 
         function renderHistory(p) {
@@ -326,13 +338,47 @@
         function renderGlobalDashboard() {
             const month = document.getElementById('monthToggle').value;
             if(!month) return;
+            
+            // Monthly Chart
             const monthly = PLAYERS.map(p => ({ name: p, pts: db[p].filter(e => e.date.startsWith(month)).reduce((a,b) => a+b.score, 0) }));
-            const max = Math.max(...monthly.map(d => d.pts), 1);
+            const maxM = Math.max(...monthly.map(d => d.pts), 1);
             document.getElementById('chartContainer').innerHTML = monthly.sort((a,b) => b.pts-a.pts).map(d => `
                 <div class="chart-row"><div class="chart-label">${d.name}</div>
-                <div class="chart-track"><div class="chart-bar" style="width:${(d.pts/max)*100}%"></div></div>
+                <div class="chart-track"><div class="chart-bar" style="width:${(d.pts/maxM)*100}%"></div></div>
                 <div class="chart-value">${d.pts}</div></div>
             `).join('');
+
+            // Season Standing (Sum of all points)
+            const season = PLAYERS.map(p => ({ name: p, pts: db[p].reduce((a,b) => a+b.score, 0) }));
+            const maxS = Math.max(...season.map(d => d.pts), 1);
+            document.getElementById('totalPointsContainer').innerHTML = season.sort((a,b) => b.pts-a.pts).map(d => `
+                <div class="chart-row"><div class="chart-label">${d.name}</div>
+                <div class="chart-track"><div class="chart-bar total-bar" style="width:${(d.pts/maxS)*100}%"></div></div>
+                <div class="chart-value">${d.pts}</div></div>
+            `).join('');
+
+            // Superlatives
+            const stats = [
+                { l: 'Most 3 Pts', k: '3pt' }, { l: 'Longest Streak', k: 'str' }, { l: 'Most Fails', k: 'fail' }
+            ];
+
+            document.getElementById('superlativesContainer').innerHTML = stats.map(s => {
+                const res = PLAYERS.map(p => {
+                    const mHist = db[p].filter(e => e.date.startsWith(month)).sort((a,b) => a.date.localeCompare(b.date));
+                    let val = 0;
+                    if(s.k === '3pt') val = mHist.filter(e => e.score === 3).length;
+                    if(s.k === 'fail') val = mHist.filter(e => e.score === 0).length;
+                    if(s.k === 'str') {
+                        let cur = 0, max = 0;
+                        mHist.forEach(e => { if(e.score > 0) { cur++; max = Math.max(max, cur); } else cur = 0; });
+                        val = max;
+                    }
+                    return { n: p, v: val };
+                });
+                const topVal = Math.max(...res.map(r => r.v));
+                const winners = res.filter(r => r.v === topVal && topVal > 0).map(r => r.n);
+                return `<div class="super-card"><h4>${s.l}</h4><div class="super-winner">${winners.length ? winners.join(', ') : 'N/A'}</div><div class="super-val">${topVal}</div></div>`;
+            }).join('');
         }
 
         init();
