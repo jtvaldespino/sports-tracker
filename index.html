@@ -298,21 +298,50 @@
             renderGlobalDashboard();
         }
 
-        async function saveData() {
-            const d = document.getElementById('dateEntry').value;
-            if (!d || selectedGroups === null) return alert("Select date and groups!");
-            const perf = document.getElementById('isPerfect').checked;
-            const purp = document.getElementById('isPurpleFirst').checked;
-            const s = selectedGroups < 4 ? 0 : (purp ? 3 : (perf ? 2 : 1));
-            const payload = { date: d, player: activePlayer, groups: selectedGroups, perfect: perf, purple: purp, score: s };
-            const btn = document.getElementById('saveBtn');
-            btn.disabled = true; btn.innerText = "Syncing...";
-            try {
-                await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
-                await refreshDataFromCloud();
-                btn.disabled = false; btn.innerText = "Save Result";
-            } catch (e) { alert("Save failed!"); btn.disabled = false; btn.innerText = "Save Result"; }
-        }
+		async function saveData() {
+			const d = document.getElementById('dateEntry').value;
+			if (!d || selectedGroups === null) return alert("Select date and groups!");
+			
+			const perf = document.getElementById('isPerfect').checked;
+			const purp = document.getElementById('isPurpleFirst').checked;
+			const s = selectedGroups < 4 ? 0 : (purp ? 3 : (perf ? 2 : 1));
+
+			const payload = { date: d, player: activePlayer, groups: selectedGroups, perfect: perf, purple: purp, score: s };
+			const btn = document.getElementById('saveBtn');
+			
+			btn.disabled = true; 
+			btn.innerText = "Syncing...";
+
+			// --- MANUALLY UPDATE LOCAL VIEW IMMEDIATELY ---
+			// 1. Remove old entry for this date if it exists
+			db[activePlayer] = db[activePlayer].filter(entry => entry.date !== d);
+			// 2. Add the new entry
+			db[activePlayer].push({ date: d, groups: selectedGroups, perfect: perf, purple: purp, score: s });
+			
+			// 3. Refresh the UI right away
+			renderHistory(activePlayer);
+			renderGlobalDashboard();
+
+			try {
+				await fetch(SCRIPT_URL, { 
+					method: 'POST', 
+					mode: 'no-cors', 
+					body: JSON.stringify(payload) 
+				});
+				
+				// Brief delay then try to sync everything just in case
+				setTimeout(() => {
+					btn.disabled = false;
+					btn.innerText = "Save Result";
+					refreshDataFromCloud(); 
+				}, 1000);
+
+			} catch (e) { 
+				alert("Sync Error - Data saved locally only.");
+				btn.disabled = false;
+				btn.innerText = "Save Result";
+			}
+		}
 
         function populateMonthToggle() {
             const select = document.getElementById('monthToggle');
