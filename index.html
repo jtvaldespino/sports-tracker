@@ -360,60 +360,86 @@
             `).join('');
         }
 
-        function renderGlobalDashboard() {
-            const month = document.getElementById('monthToggle').value;
-            if(!month) return;
-            const monthlyScores = PLAYERS.map(p => ({ 
-                name: p, pts: db[p].filter(e => e.date.startsWith(month)).reduce((a,b) => a+b.score, 0) 
-            }));
-            const maxM = Math.max(...monthlyScores.map(d => d.pts), 1);
-            document.getElementById('chartContainer').innerHTML = monthlyScores.sort((a,b) => b.pts - a.pts).map(d => `
-                <div class="chart-row"><div class="chart-label">${d.name}</div>
-                <div class="chart-track"><div class="chart-bar" style="width:${(d.pts/maxM)*100}%"></div></div>
-                <div class="chart-value">${d.pts}</div></div>`).join('');
+		function renderGlobalDashboard() {
+			const month = document.getElementById('monthToggle').value;
+			if(!month) return;
+			
+			// 1. Monthly Chart
+			const monthlyScores = PLAYERS.map(p => ({ 
+				name: p, pts: db[p].filter(e => e.date.startsWith(month)).reduce((a,b) => a+b.score, 0) 
+			}));
+			const maxM = Math.max(...monthlyScores.map(d => d.pts), 1);
+			document.getElementById('chartContainer').innerHTML = monthlyScores.sort((a,b) => b.pts - a.pts).map(d => `
+				<div class="chart-row"><div class="chart-label">${d.name}</div>
+				<div class="chart-track"><div class="chart-bar" style="width:${(d.pts/maxM)*100}%"></div></div>
+				<div class="chart-value">${d.pts}</div></div>`).join('');
 
-            const allMonths = [...new Set(Object.values(db).flat().map(e => e.date.slice(0, 7)))];
-            let seasonBonusTotals = { 'Al': 0, 'Andres': 0, 'Mark': 0, 'Gus': 0 };
-            allMonths.forEach(m => {
-                const mRank = PLAYERS.map(p => ({
-                    name: p, pts: db[p].filter(e => e.date.startsWith(m)).reduce((a,b) => a+b.score, 0)
-                })).sort((a,b) => b.pts - a.pts);
-                const bonuses = [12, 5, 3, 1];
-                mRank.forEach((player, index) => {
-                    if (index > 0 && player.pts === mRank[index-1].pts) {
-                        seasonBonusTotals[player.name] += (index === 1 ? 12 : index === 2 ? 5 : 3); 
-                    } else { seasonBonusTotals[player.name] += bonuses[index]; }
-                });
-            });
-            const seasonData = PLAYERS.map(p => ({ name: p, pts: seasonBonusTotals[p] }));
-            const maxS = Math.max(...seasonData.map(d => d.pts), 1);
-            document.getElementById('totalPointsContainer').innerHTML = seasonData.sort((a,b) => b.pts - a.pts).map(d => `
-                <div class="chart-row"><div class="chart-label">${d.name}</div>
-                <div class="chart-track"><div class="chart-bar total-bar" style="width:${(d.pts/maxS)*100}%"></div></div>
-                <div class="chart-value">${d.pts}</div></div>`).join('');
-            renderSuperlatives(month);
-        }
+			// 2. Season Standing (Only award points for COMPLETED months)
+			const allMonths = [...new Set(Object.values(db).flat().map(e => e.date.slice(0, 7)))].sort();
+			let seasonBonusTotals = { 'Al': 0, 'Andres': 0, 'Mark': 0, 'Gus': 0 };
 
-        function renderSuperlatives(month) {
-            const stats = [{ l: 'Most 3 Pts', k: '3pt' }, { l: 'Longest Streak', k: 'str' }, { l: 'Most Fails', k: 'fail' }];
-            document.getElementById('superlativesContainer').innerHTML = stats.map(s => {
-                const res = PLAYERS.map(p => {
-                    const mHist = db[p].filter(e => e.date.startsWith(month)).sort((a,b) => a.date.localeCompare(b.date));
-                    let val = 0;
-                    if(s.k === '3pt') val = mHist.filter(e => e.score === 3).length;
-                    if(s.k === 'fail') val = mHist.filter(e => e.score === 0).length;
-                    if(s.k === 'str') {
-                        let cur = 0, max = 0;
-                        mHist.forEach(e => { if(e.score > 0) { cur++; max = Math.max(max, cur); } else cur = 0; });
-                        val = max;
-                    }
-                    return { n: p, v: val };
-                });
-                const topVal = Math.max(...res.map(r => r.v));
-                const winners = res.filter(r => r.v === topVal && topVal > 0).map(r => r.n);
-                return `<div class="super-card"><h4>${s.l}</h4><div class="super-winner">${winners.length ? winners.join(', ') : 'N/A'}</div><div class="super-val">${topVal}</div></div>`;
-            }).join('');
-        }
+			allMonths.forEach(m => {
+				// Define "Complete" as a month that has passed or is February and has 28+ entries
+				const entriesInMonth = db[PLAYERS[0]].filter(e => e.date.startsWith(m)).length;
+				const isPastMonth = new Date(m + "-28") < new Date(); 
+				
+				// Only calculate bonus if the month is finished
+				if (isPastMonth && entriesInMonth >= 28) {
+					const mRank = PLAYERS.map(p => ({
+						name: p, pts: db[p].filter(e => e.date.startsWith(m)).reduce((a,b) => a+b.score, 0)
+					})).sort((a,b) => b.pts - a.pts);
+
+					const bonuses = [12, 5, 3, 1];
+					mRank.forEach((player, index) => {
+						seasonBonusTotals[player.name] += bonuses[index];
+					});
+				}
+			});
+
+			const seasonData = PLAYERS.map(p => ({ name: p, pts: seasonBonusTotals[p] }));
+			const maxS = Math.max(...seasonData.map(d => d.pts), 1);
+			document.getElementById('totalPointsContainer').innerHTML = seasonData.sort((a,b) => b.pts - a.pts).map(d => `
+				<div class="chart-row"><div class="chart-label">${d.name}</div>
+				<div class="chart-track"><div class="chart-bar total-bar" style="width:${(d.pts/maxS)*100}%"></div></div>
+				<div class="chart-value">${d.pts}</div></div>`).join('');
+
+			renderSuperlatives(month);
+		}
+
+		function renderSuperlatives(month) {
+			const statsConfig = [
+				{ l: 'Most 3 Pts', k: '3pt' },
+				{ l: 'Most 1 Pt', k: '1pt' },
+				{ l: 'Most 0 Pts', k: '0pt' },
+				{ l: 'Longest Streak', k: 'str' },
+				{ l: 'Dry Spell', k: 'dry' }
+			];
+
+			document.getElementById('superlativesContainer').innerHTML = statsConfig.map(s => {
+				const res = PLAYERS.map(p => {
+					const mHist = db[p].filter(e => e.date.startsWith(month)).sort((a,b) => a.date.localeCompare(b.date));
+					let val = 0;
+					if(s.k === '3pt') val = mHist.filter(e => e.score === 3).length;
+					if(s.k === '1pt') val = mHist.filter(e => e.score === 1).length;
+					if(s.k === '0pt') val = mHist.filter(e => e.score === 0).length;
+					if(s.k === 'str') {
+						let cur = 0, max = 0;
+						mHist.forEach(e => { if(e.score > 0) { cur++; max = Math.max(max, cur); } else cur = 0; });
+						val = max;
+					}
+					if(s.k === 'dry') {
+						let cur = 0, max = 0;
+						mHist.forEach(e => { if(e.score === 0) { cur++; max = Math.max(max, cur); } else cur = 0; });
+						val = max;
+					}
+					return { n: p, v: val };
+				});
+
+				const topVal = Math.max(...res.map(r => r.v));
+				const winners = res.filter(r => r.v === topVal && topVal > 0).map(r => r.n);
+				return `<div class="super-card"><h4>${s.l}</h4><div class="super-winner">${winners.length ? winners.join(', ') : 'N/A'}</div><div class="super-val">${topVal}</div></div>`;
+			}).join('');
+		}
         init();
     </script>
 </body>
