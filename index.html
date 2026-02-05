@@ -204,7 +204,7 @@
     </div>
 
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxyeqKspdOiduWojU0kZMq1iK4BJ3CmxVyQIAZTjQ92RjlwcWJzzs8lQu9e11lbHEkrnA/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDzr9KQhPuWKMVtaiLk5RNVfk39p-kXc-0YjmYxuuMWUY4KSMzy-oxtdQ8_HSJwxMCBA/exec"; 
 
         const PLAYERS = ['Al', 'Andres', 'Mark', 'Gus'];
         let db = {};
@@ -251,7 +251,7 @@
         }
 
         async function refreshDataFromCloud() {
-            if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbxyeqKspdOiduWojU0kZMq1iK4BJ3CmxVyQIAZTjQ92RjlwcWJzzs8lQu9e11lbHEkrnA/exec")) return;
+            if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbzDzr9KQhPuWKMVtaiLk5RNVfk39p-kXc-0YjmYxuuMWUY4KSMzy-oxtdQ8_HSJwxMCBA/exec")) return;
             const response = await fetch(SCRIPT_URL);
             const cloudData = await response.json();
             
