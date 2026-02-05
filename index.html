@@ -145,11 +145,11 @@
                             <button type="button" class="group-btn" data-val="4">4</button>
                         </div>
                     </div>
-                    <div class="checkbox-wrapper disabled" id="perfectWrapper">
-                        <input type="checkbox" id="isPerfect" disabled><label for="isPerfect" style="margin:0; cursor:pointer;">Perfect (No mistakes)</label>
+                    <div class="checkbox-wrapper" id="perfectWrapper">
+                        <input type="checkbox" id="isPerfect"><label for="isPerfect" style="margin:0; cursor:pointer;">Perfect (No mistakes)</label>
                     </div>
-                    <div class="checkbox-wrapper disabled" id="purpleWrapper">
-                        <input type="checkbox" id="isPurpleFirst" disabled><label for="isPurpleFirst" style="margin:0; cursor:pointer;">Purple Solved First</label>
+                    <div class="checkbox-wrapper" id="purpleWrapper">
+                        <input type="checkbox" id="isPurpleFirst"><label for="isPurpleFirst" style="margin:0; cursor:pointer;">Purple Solved First</label>
                     </div>
                     <button class="btn-save" id="saveBtn" onclick="saveData()">Save Result</button>
                 </div>
@@ -278,15 +278,10 @@
             document.getElementById('isPerfect').onchange = updateCheckboxes;
         }
 
-        function updateCheckboxes() {
-            const perf = document.getElementById('isPerfect'), purp = document.getElementById('isPurpleFirst');
-            perf.disabled = selectedGroups !== 4;
-            purp.disabled = !perf.checked || selectedGroups !== 4;
-            if (perf.disabled) perf.checked = false;
-            if (purp.disabled) purp.checked = false;
-            document.getElementById('perfectWrapper').classList.toggle('disabled', perf.disabled);
-            document.getElementById('purpleWrapper').classList.toggle('disabled', purp.disabled);
-        }
+		function updateCheckboxes() {
+			// Restrictions removed as requested.
+			// We keep the function name so the listeners don't break.
+		}
 
         async function enterApp(name) {
             activePlayer = name;
@@ -299,49 +294,52 @@
         }
 
 		async function saveData() {
-					const d = document.getElementById('dateEntry').value;
-					if (!d || selectedGroups === null) return alert("Select date and groups!");
-					
-					const perf = document.getElementById('isPerfect').checked;
-					const purp = document.getElementById('isPurpleFirst').checked;
-					const s = selectedGroups < 4 ? 0 : (purp ? 3 : (perf ? 2 : 1));
+			const d = document.getElementById('dateEntry').value;
+			if (!d || selectedGroups === null) return alert("Select date and groups!");
+			
+			const perf = document.getElementById('isPerfect').checked;
+			const purp = document.getElementById('isPurpleFirst').checked;
+			const s = selectedGroups < 4 ? 0 : (purp ? 3 : (perf ? 2 : 1));
 
-					const payload = { date: d, player: activePlayer, groups: selectedGroups, perfect: perf, purple: purp, score: s };
-					const btn = document.getElementById('saveBtn');
-					
-					btn.disabled = true; 
-					btn.innerText = "Syncing...";
+			const payload = { date: d, player: activePlayer, groups: selectedGroups, perfect: perf, purple: purp, score: s };
+			const btn = document.getElementById('saveBtn');
+			
+			btn.disabled = true; 
+			btn.innerText = "Syncing...";
 
-					// --- MANUALLY UPDATE LOCAL VIEW IMMEDIATELY ---
-					// 1. Remove old entry for this date if it exists
-					db[activePlayer] = db[activePlayer].filter(entry => entry.date !== d);
-					// 2. Add the new entry
-					db[activePlayer].push({ date: d, groups: selectedGroups, perfect: perf, purple: purp, score: s });
-					
-					// 3. Refresh the UI right away
-					renderHistory(activePlayer);
-					renderGlobalDashboard();
+			// --- CRITICAL HISTORY FIX ---
+			// Update the local database immediately so history updates on screen
+			const newEntry = { date: d, groups: selectedGroups, perfect: perf, purple: purp, score: s };
+			
+			// Remove any existing entry for this date to avoid duplicates in the history view
+			db[activePlayer] = db[activePlayer].filter(entry => entry.date !== d);
+			db[activePlayer].push(newEntry);
+			
+			// Re-render the tables and charts immediately
+			renderHistory(activePlayer);
+			renderGlobalDashboard();
 
-					try {
-						await fetch(SCRIPT_URL, { 
-							method: 'POST', 
-							mode: 'no-cors', 
-							body: JSON.stringify(payload) 
-						});
-						
-						// Brief delay then try to sync everything just in case
-						setTimeout(() => {
-							btn.disabled = false;
-							btn.innerText = "Save Result";
-							refreshDataFromCloud(); 
-						}, 1000);
+			try {
+				await fetch(SCRIPT_URL, { 
+					method: 'POST', 
+					mode: 'no-cors', 
+					body: JSON.stringify(payload) 
+				});
+				
+				// Success feedback
+				setTimeout(() => {
+					btn.disabled = false;
+					btn.innerText = "Save Result";
+					// Optional: refresh from cloud to get other players' updates
+					refreshDataFromCloud(); 
+				}, 1000);
 
-					} catch (e) { 
-						alert("Sync Error - Data saved locally only.");
-						btn.disabled = false;
-						btn.innerText = "Save Result";
-					}
-				}
+			} catch (e) { 
+				console.error("Sync Error:", e);
+				btn.disabled = false;
+				btn.innerText = "Save Result";
+			}
+		}
 
 		function populateMonthToggle() {
 			const select = document.getElementById('monthToggle');
@@ -451,4 +449,3 @@
     </script>
 </body>
 </html>
-
