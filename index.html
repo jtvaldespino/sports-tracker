@@ -218,12 +218,20 @@
         let activePlayer = '';
         let selectedGroups = null;
 
-        async function init() {
-            PLAYERS.forEach(p => db[p] = []);
-            document.getElementById('dateEntry').valueAsDate = new Date();
-            setupInteractionListeners();
-            await refreshDataFromCloud();
-        }
+		async function init() {
+			// 1. Initialize empty arrays for everyone
+			PLAYERS.forEach(p => db[p] = []);
+			
+			// 2. Load the January backfill FIRST
+			loadJanuaryData(); 
+			
+			// 3. Set the date picker to today
+			document.getElementById('dateEntry').valueAsDate = new Date();
+			setupInteractionListeners();
+			
+			// 4. Now fetch any NEW data from the cloud
+			await refreshDataFromCloud();
+		}
 
         function setupInteractionListeners() {
             document.querySelectorAll('.group-btn').forEach(btn => {
@@ -258,21 +266,15 @@
         }
 
 		async function refreshDataFromCloud() {
-			if (SCRIPT_URL === "YOUR_GOOGLE_WEB_APP_URL_HERE") return;
+			if (SCRIPT_URL === "YOUR_GOOGLE_WEB_APP_URL_HERE" || SCRIPT_URL === "") return;
 			try {
 				const response = await fetch(SCRIPT_URL);
 				const cloudData = await response.json();
 				
-				// Reset local database
-				PLAYERS.forEach(p => db[p] = []);
-				
-				// 1. Load the fixed January data first
-				loadJanuaryData();
-
-				// 2. Add the data from the Google Sheet on top of it
+				// Add cloud data ONLY if it's not already in January
 				cloudData.forEach(row => {
 					const [date, player, groups, perfect, purple, score] = row;
-					// Only add if it's NOT a January date (to avoid duplicates)
+					// This prevents duplicating the January backfill
 					if(db[player] && !date.startsWith("2025-01")) { 
 						db[player].push({ date, groups, perfect, purple, score });
 					}
@@ -283,10 +285,6 @@
 				if(activePlayer) renderHistory(activePlayer);
 			} catch (e) { 
 				console.error("Cloud Error:", e);
-				// If the cloud fails, at least show Jan data
-				PLAYERS.forEach(p => db[p] = []);
-				loadJanuaryData();
-				renderGlobalDashboard();
 			}
 		}
 
