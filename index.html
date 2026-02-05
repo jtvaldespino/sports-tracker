@@ -1,81 +1,292 @@
-<script>
-    const PLAYERS = ['Al', 'Andres', 'Mark', 'Gus'];
-    // PASTE YOUR URL BELOW BETWEEN THE QUOTES
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0ZOayLzHfCS74cvtkfkTko2dFFYUrPHAov8kOA4KrsLQa6d2ULKsAeMpCEAGupCbDbA/exec"; 
-    
-    let db = {};
-    let activePlayer = '';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sports Connections Tracker</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --secondary: #ec4899;
+            --bg-grad-start: #1e1b4b;
+            --bg-grad-end: #312e81;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --font-stack: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
 
-    async function init() {
-        // 1. First, check if we have data in the cloud
-        await refreshDataFromCloud();
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-stack);
+            background-color: #f3f4f6;
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        #landing-page {
+            position: fixed; inset: 0;
+            background: linear-gradient(135deg, var(--bg-grad-start), var(--bg-grad-end));
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1000; color: white; text-align: center; padding: 1rem;
+        }
+
+        .landing-logo { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; letter-spacing: -1px; }
+        .landing-sub { color: #a5b4fc; margin-bottom: 3rem; font-size: 1.1rem; }
+
+        .player-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; width: 100%; max-width: 500px; }
+        .player-btn {
+            background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2);
+            padding: 2rem 1rem; border-radius: 16px; color: white; font-size: 1.25rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .player-btn:hover { background: white; color: var(--bg-grad-start); transform: translateY(-5px); }
+
+        #main-app { display: none; }
+
+        header {
+            background: linear-gradient(135deg, var(--bg-grad-start), var(--bg-grad-end));
+            color: white; padding: 1.5rem 1rem; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 2rem;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 0 1rem 4rem 1rem; display: flex; flex-direction: column; gap: 1.5rem; }
+        .grid-row { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+
+        @media (min-width: 1024px) {
+            .top-grid { grid-template-columns: 1.2fr 1fr 0.8fr; align-items: stretch; }
+            .mid-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        .card { background: var(--card-bg); border-radius: 12px; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); padding: 1.5rem; border: 1px solid var(--border); height: 100%; }
+        .card-header { margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-size: 1.125rem; font-weight: 600; }
         
-        // 2. Set default date
-        document.getElementById('dateEntry').valueAsDate = new Date();
-        setupInteractionListeners();
-        populateMonthToggle();
-    }
+        .form-group { margin-bottom: 1.25rem; }
+        label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; }
+        
+        .active-player-tag { background: #eef2ff; color: var(--primary); padding: 0.5rem; border-radius: 6px; font-weight: 700; display: inline-block; width: 100%; text-align: center; border: 1px solid #c7d2fe; }
 
-    async function refreshDataFromCloud() {
-        try {
-            const response = await fetch(SCRIPT_URL);
-            const cloudData = await response.json();
-            
-            // Reset local DB
+        input[type="date"] { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; }
+
+        .group-selector { display: flex; gap: 0.5rem; }
+        .group-btn { flex: 1; padding: 0.5rem; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .group-btn.active { background-color: var(--primary); color: white; border-color: var(--primary); }
+
+        .checkbox-wrapper { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.5rem; }
+        .checkbox-wrapper.disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-save { width: 100%; background-color: var(--primary); color: white; padding: 0.75rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-save:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+        .table-container { max-height: 380px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        th { text-align: left; padding: 0.75rem 0.5rem; color: var(--text-muted); border-bottom: 1px solid var(--border); position: sticky; top: 0; background: white; }
+        td { padding: 0.75rem 0.5rem; border-bottom: 1px solid #f3f4f6; }
+        
+        .score-badge { padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
+        .score-3 { background-color: #f3e8ff; color: #6b21a8; }
+        .score-2 { background-color: #d1fae5; color: #065f46; }
+        .score-1 { background-color: #f3f4f6; color: #374151; }
+        .score-0 { background-color: #fee2e2; color: #991b1b; }
+
+        .chart-row { display: flex; align-items: center; margin-bottom: 0.75rem; gap: 1rem; }
+        .chart-label { width: 60px; font-weight: 600; font-size: 0.9rem; text-align: right; }
+        .chart-track { flex-grow: 1; background-color: #f3f4f6; height: 24px; border-radius: 4px; overflow: hidden; }
+        .chart-bar { height: 100%; background: linear-gradient(90deg, var(--secondary), var(--primary)); border-radius: 4px; transition: width 0.5s ease-out; }
+        .chart-bar.total-bar { background: linear-gradient(90deg, #f59e0b, #d97706); }
+        .chart-value { width: 40px; font-weight: 700; font-size: 0.9rem; }
+
+        .super-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+        .super-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; text-align: center; }
+        .super-winner { font-size: 1rem; font-weight: 700; color: var(--primary); margin-bottom: 0.25rem;}
+        
+        .logout-btn { font-size: 0.75rem; color: #a5b4fc; cursor: pointer; text-decoration: underline; background: none; border: none; margin-top: 0.5rem; }
+        .month-toggle { padding: 0.25rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.875rem; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div id="landing-page">
+        <div class="landing-logo">Sports Connections</div>
+        <p class="landing-sub">Select your name to enter</p>
+        <div class="player-grid">
+            <button class="player-btn" onclick="enterApp('Al')">Al</button>
+            <button class="player-btn" onclick="enterApp('Andres')">Andres</button>
+            <button class="player-btn" onclick="enterApp('Mark')">Mark</button>
+            <button class="player-btn" onclick="enterApp('Gus')">Gus</button>
+        </div>
+    </div>
+
+    <div id="main-app">
+        <header>
+            <h1>Sports Connections Tracker</h1>
+            <button class="logout-btn" onclick="location.reload()">← Switch Player</button>
+        </header>
+        <div class="container">
+            <div class="grid-row top-grid">
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title">Log Daily Puzzle</h2></div>
+                    <div class="form-group"><label>Logging for:</label><div id="activePlayerTag" class="active-player-tag">...</div></div>
+                    <div class="form-group"><label>Date</label><input type="date" id="dateEntry"></div>
+                    <div class="form-group">
+                        <label>Groups Correct</label>
+                        <div class="group-selector" id="groupBtnContainer">
+                            <button type="button" class="group-btn" data-val="0">0</button>
+                            <button type="button" class="group-btn" data-val="1">1</button>
+                            <button type="button" class="group-btn" data-val="2">2</button>
+                            <button type="button" class="group-btn" data-val="3">3</button>
+                            <button type="button" class="group-btn" data-val="4">4</button>
+                        </div>
+                    </div>
+                    <div class="checkbox-wrapper disabled" id="perfectWrapper">
+                        <input type="checkbox" id="isPerfect" disabled><label for="isPerfect" style="margin:0; cursor:pointer;">Perfect (No mistakes)</label>
+                    </div>
+                    <div class="checkbox-wrapper disabled" id="purpleWrapper">
+                        <input type="checkbox" id="isPurpleFirst" disabled><label for="isPurpleFirst" style="margin:0; cursor:pointer;">Purple Solved First</label>
+                    </div>
+                    <button class="btn-save" id="saveBtn" onclick="saveData()">Save Result</button>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title"><span id="statsPlayerName">...</span>'s History</h2></div>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>Date</th><th>Right</th><th>Details</th><th style="text-align: right;">Pts</th></tr></thead>
+                            <tbody id="historyBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title">Point Rules</h2></div>
+                    <p style="font-size: 0.8rem; color: var(--text-muted);">Points sync across all players via Google Sheets.</p>
+                </div>
+            </div>
+            <div class="grid-row mid-grid">
+                <div class="card"><div class="card-header"><h2 class="card-title">Monthly Chart</h2><select id="monthToggle" class="month-toggle" onchange="renderGlobalDashboard()"></select></div><div id="chartContainer"></div></div>
+                <div class="card"><div class="card-header"><h2 class="card-title">Season Standing</h2></div><div id="totalPointsContainer"></div></div>
+            </div>
+            <div class="card"><div class="card-header"><h2 class="card-title" id="superTitle">Superlatives</h2></div><div class="super-grid" id="superlativesContainer"></div></div>
+        </div>
+    </div>
+
+    <script>
+        // ---------------------------------------------------------
+        // PASTE YOUR GOOGLE WEB APP URL BETWEEN THE QUOTES BELOW:
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0ZOayLzHfCS74cvtkfkTko2dFFYUrPHAov8kOA4KrsLQa6d2ULKsAeMpCEAGupCbDbA/exec"; 
+        // ---------------------------------------------------------
+
+        const PLAYERS = ['Al', 'Andres', 'Mark', 'Gus'];
+        let db = {};
+        let activePlayer = '';
+        let selectedGroups = null;
+
+        async function init() {
             PLAYERS.forEach(p => db[p] = []);
-            
-            // Format cloud data back into our app's structure
-            cloudData.forEach(row => {
-                const [date, player, groups, perfect, purple, score] = row;
-                if(db[player]) {
-                    db[player].push({ date, groups, perfect, purple, score });
-                }
-            });
-            renderGlobalDashboard();
-        } catch (e) {
-            console.log("Offline or Error loading cloud data");
-        }
-    }
-
-    async function saveData() {
-        const d = document.getElementById('dateEntry').value;
-        if (!d || selectedGroups === null) return alert("Select date and groups!");
-        
-        const perf = document.getElementById('isPerfect').checked;
-        const purp = document.getElementById('isPurpleFirst').checked;
-        const s = selectedGroups < 4 ? 0 : (purp ? 3 : (perf ? 2 : 1));
-
-        const payload = {
-            date: d,
-            player: activePlayer,
-            groups: selectedGroups,
-            perfect: perf,
-            purple: purp,
-            score: s
-        };
-
-        // Show a loading state
-        const saveBtn = document.querySelector('.btn-save');
-        saveBtn.innerText = "Saving to Cloud...";
-        saveBtn.disabled = true;
-
-        try {
-            await fetch(SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            
-            // After saving, refresh everything
+            document.getElementById('dateEntry').valueAsDate = new Date();
+            setupInteractionListeners();
             await refreshDataFromCloud();
-            renderHistory(activePlayer);
-            saveBtn.innerText = "Save Result";
-            saveBtn.disabled = false;
-            alert("Score Recorded!");
-        } catch (e) {
-            alert("Error saving. Check your internet.");
-            saveBtn.disabled = false;
         }
-    }
 
-    // ... Keep all your previous CSS, HTML, and other JS functions (renderHistory, renderGlobalDashboard, etc.) ...
-</script>
+        function setupInteractionListeners() {
+            document.querySelectorAll('.group-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.group-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedGroups = parseInt(btn.dataset.val);
+                    updateCheckboxes();
+                };
+            });
+            document.getElementById('isPerfect').onchange = updateCheckboxes;
+        }
+
+        function updateCheckboxes() {
+            const perf = document.getElementById('isPerfect'), purp = document.getElementById('isPurpleFirst');
+            perf.disabled = selectedGroups !== 4;
+            purp.disabled = !perf.checked || selectedGroups !== 4;
+            if (perf.disabled) perf.checked = false;
+            if (purp.disabled) purp.checked = false;
+            document.getElementById('perfectWrapper').classList.toggle('disabled', perf.disabled);
+            document.getElementById('purpleWrapper').classList.toggle('disabled', purp.disabled);
+        }
+
+        async function enterApp(name) {
+            activePlayer = name;
+            document.getElementById('landing-page').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('activePlayerTag').innerText = name;
+            document.getElementById('statsPlayerName').innerText = name;
+            renderHistory(name);
+            renderGlobalDashboard();
+        }
+
+        async function refreshDataFromCloud() {
+            if (SCRIPT_URL === "YOUR_GOOGLE_WEB_APP_URL_HERE") return;
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const cloudData = await response.json();
+                PLAYERS.forEach(p => db[p] = []);
+                cloudData.forEach(row => {
+                    const [date, player, groups, perfect, purple, score] = row;
+                    if(db[player]) db[player].push({ date, groups, perfect, purple, score });
+                });
+                populateMonthToggle();
+                renderGlobalDashboard();
+                if(activePlayer) renderHistory(activePlayer);
+            } catch (e) { console.error("Cloud Error:", e); }
+        }
+
+        async function saveData() {
+            const d = document.getElementById('dateEntry').value;
+            if (!d || selectedGroups === null) return alert("Select date and groups!");
+            const perf = document.getElementById('isPerfect').checked;
+            const purp = document.getElementById('isPurpleFirst').checked;
+            const s = selectedGroups < 4 ? 0 : (purp ? 3 : (perf ? 2 : 1));
+
+            const payload = { date: d, player: activePlayer, groups: selectedGroups, perfect: perf, purple: purp, score: s };
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true; btn.innerText = "Syncing...";
+
+            try {
+                await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+                await refreshDataFromCloud();
+                btn.disabled = false; btn.innerText = "Save Result";
+            } catch (e) { alert("Save failed!"); btn.disabled = false; }
+        }
+
+        function populateMonthToggle() {
+            const select = document.getElementById('monthToggle');
+            const currentVal = select.value;
+            const months = [...new Set(Object.values(db).flat().map(e => e.date.slice(0, 7)))].sort().reverse();
+            if (months.length === 0) return;
+            select.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+            if (currentVal && months.includes(currentVal)) select.value = currentVal;
+        }
+
+        function renderHistory(p) {
+            const hist = [...db[p]].sort((a,b) => b.date.localeCompare(a.date));
+            document.getElementById('historyBody').innerHTML = hist.map(e => `
+                <tr><td>${e.date.slice(5)}</td><td>${e.groups}/4</td><td>${e.purple?'Purp':(e.perfect?'Perf':'-')}</td>
+                <td style="text-align:right"><span class="score-badge score-${e.score}">+${e.score}</span></td></tr>
+            `).join('');
+        }
+
+        function renderGlobalDashboard() {
+            const month = document.getElementById('monthToggle').value;
+            if(!month) return;
+            const monthly = PLAYERS.map(p => ({ name: p, pts: db[p].filter(e => e.date.startsWith(month)).reduce((a,b) => a+b.score, 0) }));
+            const max = Math.max(...monthly.map(d => d.pts), 1);
+            document.getElementById('chartContainer').innerHTML = monthly.sort((a,b) => b.pts-a.pts).map(d => `
+                <div class="chart-row"><div class="chart-label">${d.name}</div>
+                <div class="chart-track"><div class="chart-bar" style="width:${(d.pts/max)*100}%"></div></div>
+                <div class="chart-value">${d.pts}</div></div>
+            `).join('');
+        }
+
+        init();
+    </script>
+</body>
+</html>
