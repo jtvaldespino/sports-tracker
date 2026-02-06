@@ -305,7 +305,7 @@
 			document.getElementById('activePlayerTag').innerText = name;
 			document.getElementById('statsPlayerName').innerText = name;
 			
-			// This forces the app to look at the cloud the moment you click a name
+			// Force a pull from the cloud so the history is current
 			await refreshDataFromCloud(); 
 			
 			renderHistory(name);
