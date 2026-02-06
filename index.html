@@ -250,24 +250,44 @@
             });
         }
 
-        async function refreshDataFromCloud() {
-            if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbzDzr9KQhPuWKMVtaiLk5RNVfk39p-kXc-0YjmYxuuMWUY4KSMzy-oxtdQ8_HSJwxMCBA/exec")) return;
-            const response = await fetch(SCRIPT_URL);
-            const cloudData = await response.json();
-            
-            // Re-sync local state from Sheet
-            cloudData.forEach(row => {
-                const [date, player, groups, perfect, purple, score] = row;
-                if(db[player]) {
-                    // Update if exists, else push
-                    db[player] = db[player].filter(e => e.date !== date);
-                    db[player].push({ date, groups, perfect, purple, score });
-                }
-            });
-            populateMonthToggle();
-            renderGlobalDashboard();
-            if(activePlayer) renderHistory(activePlayer);
-        }
+		async function refreshDataFromCloud() {
+			if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbzDzr9KQhPuWKMVtaiLk5RNVfk39p-kXc-0YjmYxuuMWUY4KSMzy-oxtdQ8_HSJwxMCBA/exec")) return;
+			
+			try {
+				const response = await fetch(SCRIPT_URL);
+				const cloudData = await response.json();
+				
+				console.log("Data received from Google:", cloudData);
+
+				if (cloudData.length === 0) {
+					console.warn("Cloud pull successful, but the spreadsheet appears to be empty.");
+				}
+
+				cloudData.forEach(row => {
+					const [date, player, groups, perfect, purple, score] = row;
+					if(db[player]) {
+						// Ensure we don't duplicate January's hardcoded data
+						db[player] = db[player].filter(e => e.date !== date);
+						db[player].push({ 
+							date: date, 
+							groups: parseInt(groups), 
+							perfect: perfect === true || perfect === "true", 
+							purple: purple === true || purple === "true", 
+							score: parseInt(score) 
+						});
+					}
+				});
+
+				populateMonthToggle();
+				renderGlobalDashboard();
+				if(activePlayer) renderHistory(activePlayer);
+
+			} catch (e) {
+				console.error("Cloud Pull Error:", e);
+				// If you see this alert, the URL is broken or Google is blocking the request
+				alert("App could not read data from Google. Check Console for details.");
+			}
+		}
 
         function setupInteractionListeners() {
             document.querySelectorAll('.group-btn').forEach(btn => {
