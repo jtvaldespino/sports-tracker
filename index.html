@@ -204,7 +204,7 @@
     </div>
 
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyC0WpoA_5KoXGrvbKbB83Rud29wb13WEIoyacvHbyW9i6zpKtPysJaFx7BjjYRGZfIrQ/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz_2n9zHZ6NEayP0tyu204hoTs9pGt0c_NVXEh0_N83J5xeelc6hV8-vVKX03hIhqav_A/exec"; 
 
         const PLAYERS = ['Al', 'Andres', 'Mark', 'Gus'];
         let db = {};
@@ -251,41 +251,40 @@
         }
 
 		async function refreshDataFromCloud() {
-			if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbyC0WpoA_5KoXGrvbKbB83Rud29wb13WEIoyacvHbyW9i6zpKtPysJaFx7BjjYRGZfIrQ/exec")) return;
+			if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbz_2n9zHZ6NEayP0tyu204hoTs9pGt0c_NVXEh0_N83J5xeelc6hV8-vVKX03hIhqav_A/exec")) return;
 			
 			try {
-				const response = await fetch(SCRIPT_URL);
-				const cloudData = await response.json();
+				// IMPORTANT: No 'no-cors' here. Google supports CORS for GET.
+				const response = await fetch(SCRIPT_URL); 
 				
-				console.log("Data received from Google:", cloudData);
+				if (!response.ok) throw new Error('Network response was not ok');
+				
+				const cloudData = await response.json();
+				console.log("Syncing from cloud...", cloudData.length, "rows found.");
 
-				if (cloudData.length === 0) {
-					console.warn("Cloud pull successful, but the spreadsheet appears to be empty.");
-				}
+				// Clear existing February entries before rebuilding from sheet
+				PLAYERS.forEach(p => {
+					db[p] = db[p].filter(e => e.date.startsWith("2025-01"));
+				});
 
 				cloudData.forEach(row => {
 					const [date, player, groups, perfect, purple, score] = row;
 					if(db[player]) {
-						// Ensure we don't duplicate January's hardcoded data
-						db[player] = db[player].filter(e => e.date !== date);
 						db[player].push({ 
 							date: date, 
 							groups: parseInt(groups), 
-							perfect: perfect === true || perfect === "true", 
-							purple: purple === true || purple === "true", 
+							perfect: String(perfect) === "true", 
+							purple: String(purple) === "true", 
 							score: parseInt(score) 
 						});
 					}
 				});
 
-				populateMonthToggle();
 				renderGlobalDashboard();
 				if(activePlayer) renderHistory(activePlayer);
 
 			} catch (e) {
-				console.error("Cloud Pull Error:", e);
-				// If you see this alert, the URL is broken or Google is blocking the request
-				alert("App could not read data from Google. Check Console for details.");
+				console.error("Critical Sync Error:", e);
 			}
 		}
 
