@@ -204,7 +204,7 @@
     </div>
 
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDzr9KQhPuWKMVtaiLk5RNVfk39p-kXc-0YjmYxuuMWUY4KSMzy-oxtdQ8_HSJwxMCBA/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyC0WpoA_5KoXGrvbKbB83Rud29wb13WEIoyacvHbyW9i6zpKtPysJaFx7BjjYRGZfIrQ/exec"; 
 
         const PLAYERS = ['Al', 'Andres', 'Mark', 'Gus'];
         let db = {};
@@ -251,7 +251,7 @@
         }
 
 		async function refreshDataFromCloud() {
-			if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbzDzr9KQhPuWKMVtaiLk5RNVfk39p-kXc-0YjmYxuuMWUY4KSMzy-oxtdQ8_HSJwxMCBA/exec")) return;
+			if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbyC0WpoA_5KoXGrvbKbB83Rud29wb13WEIoyacvHbyW9i6zpKtPysJaFx7BjjYRGZfIrQ/exec")) return;
 			
 			try {
 				const response = await fetch(SCRIPT_URL);
@@ -299,15 +299,19 @@
             });
         }
 
-        async function enterApp(name) {
-            activePlayer = name;
-            document.getElementById('landing-page').style.display = 'none';
-            document.getElementById('main-app').style.display = 'block';
-            document.getElementById('activePlayerTag').innerText = name;
-            document.getElementById('statsPlayerName').innerText = name;
-            renderHistory(name);
-            renderGlobalDashboard();
-        }
+		async function enterApp(name) {
+			activePlayer = name;
+			document.getElementById('landing-page').style.display = 'none';
+			document.getElementById('main-app').style.display = 'block';
+			document.getElementById('activePlayerTag').innerText = name;
+			document.getElementById('statsPlayerName').innerText = name;
+			
+			// This forces the app to look at the cloud the moment you click a name
+			await refreshDataFromCloud(); 
+			
+			renderHistory(name);
+			renderGlobalDashboard();
+		}
 
         async function saveData() {
             const d = document.getElementById('dateEntry').value;
